@@ -1152,7 +1152,7 @@ function callAPI(pair,tf,prev){
   var key=APIKEY||sessionStorage.getItem('tda_key')||'';
   return fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})
   }).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
   .then(function(d){
@@ -1182,19 +1182,68 @@ function runPass(){
     if(csEl)csEl.textContent='Completed';if(cfEl){cfEl.style.width='100%';setTimeout(function(){if(cfEl)cfEl.style.width='0%';},800);}
     se('cycleLbl','CYCLE '+result.pass);
   }).catch(function(e){
-    console.error(e);if(csEl)csEl.textContent='Error - retrying';
+    console.error('API Error:',e);
+    var msg='Error: '+e.message;
+    if(e.message&&e.message.indexOf('401')>=0)msg='Error: Invalid API key';
+    else if(e.message&&e.message.indexOf('403')>=0)msg='Error: Key permissions';
+    else if(e.message&&e.message.indexOf('429')>=0)msg='Error: Rate limited';
+    else if(e.message&&e.message.indexOf('Failed to fetch')>=0)msg='Error: CORS / Network';
+    if(csEl)csEl.textContent=msg;
+    // Show error in AI panel too
+    Object.keys(PANELS).forEach(function(id){
+      if(PANELS[id].type==='ai'){
+        var body=document.getElementById('body_'+id);
+        if(body)body.innerHTML='<div class="ai-txt" style="color:var(--red)">'+msg+'<br><br>Check: 1) API key is valid<br>2) Key has credits<br>3) console.anthropic.com</div>';
+      }
+    });
   }).then(function(){LOADING=false;});
 }
+var RETRY_TIMER=null;
 function startLoop(){
-  if(TIMER)clearInterval(TIMER);if(CDTIMER)clearInterval(CDTIMER);
+  if(TIMER)clearInterval(TIMER);if(CDTIMER)clearInterval(CDTIMER);if(RETRY_TIMER)clearTimeout(RETRY_TIMER);
   CD=REFRESH/1000;
   var key=gk();
-  if(!STORE[key]||!STORE[key].current)runPass();
-  TIMER=setInterval(runPass,REFRESH);
+  if(!STORE[key]||!STORE[key].current){
+    runPassWithRetry();
+  }
+  TIMER=setInterval(runPassWithRetry,REFRESH);
   CDTIMER=setInterval(function(){
     CD=CD<=1?REFRESH/1000:CD-1;
     var el=document.getElementById('cycNextGlobal');if(el)el.textContent='Next: '+CD+'s';
   },1000);
+}
+function runPassWithRetry(){
+  var key=gk();
+  if(!STORE[key])STORE[key]={current:null,history:[],prevSig:null};
+  var st=STORE[key];
+  LOADING=true;
+  var csEl=document.getElementById('cycStatusGlobal'),cfEl=document.getElementById('cycFillGlobal');
+  if(csEl)csEl.textContent='Analysing...';if(cfEl)cfEl.style.width='20%';
+  callAPI(PAIR,TF,st.history).then(function(result){
+    var nh=st.history.concat([result]).slice(-MAXH);
+    var oldSig=st.prevSig,newSig=result.scalp.signal+'/'+result.day.signal+'/'+result.swing.signal;
+    st.current=result;st.history=nh;st.prevSig=newSig;ANALYSIS=result;
+    if(oldSig!==null&&oldSig!==newSig)showToast('Signal Changed - '+PAIR,newSig.replace(/\//g,' / '),sc(result.scalp.signal));
+    else if(oldSig===null)showToast(PAIR+' Analysis Ready',result.summary.substring(0,70)+'...',PAIRS[PAIR].col);
+    updateAllPanels();
+    if(csEl)csEl.textContent='Completed';if(cfEl){cfEl.style.width='100%';setTimeout(function(){if(cfEl)cfEl.style.width='0%';},800);}
+    se('cycleLbl','CYCLE '+result.pass);
+  }).catch(function(e){
+    console.error('API Error:',e);
+    var msg='Error: '+e.message;
+    if(e.message&&e.message.indexOf('401')>=0)msg='Invalid API key';
+    else if(e.message&&e.message.indexOf('403')>=0)msg='Key permissions denied';
+    else if(e.message&&e.message.indexOf('429')>=0)msg='Rate limited - wait 30s';
+    else if(e.message&&e.message.indexOf('Failed to fetch')>=0)msg='Network/CORS error';
+    if(csEl)csEl.textContent=msg;
+    // Auto retry in 20 seconds
+    if(RETRY_TIMER)clearTimeout(RETRY_TIMER);
+    RETRY_TIMER=setTimeout(function(){
+      var cse=document.getElementById('cycStatusGlobal');
+      if(cse)cse.textContent='Retrying...';
+      runPassWithRetry();
+    },20000);
+  }).then(function(){LOADING=false;});
 }
 
 // ---- ACTIONS ----
