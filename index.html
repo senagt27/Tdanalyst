@@ -227,6 +227,25 @@ select:focus{outline:none;border-color:var(--gold)}
 /* ── SKELETON ── */
 .skel{border-radius:4px;background:linear-gradient(90deg,var(--bg3) 25%,var(--border) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── API KEY MODAL ── */
+.key-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:9999;display:flex;align-items:center;justify-content:center}
+.key-modal{background:#0C1018;border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:28px 24px;width:360px;max-width:90vw;box-shadow:0 24px 64px rgba(0,0,0,.6)}
+.key-modal-logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.15em;color:#F5A623;margin-bottom:4px}
+.key-modal-sub{font-size:11px;color:#6B7A99;margin-bottom:20px;font-family:'JetBrains Mono',monospace;letter-spacing:.05em}
+.key-modal-label{font-size:11px;font-weight:600;color:#94A3B8;margin-bottom:6px;display:block;text-transform:uppercase;letter-spacing:.08em}
+.key-modal-input{width:100%;padding:10px 12px;background:#060910;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#F0F4FF;font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;transition:border .2s;letter-spacing:.03em}
+.key-modal-input:focus{border-color:rgba(245,166,35,.5)}
+.key-modal-input::placeholder{color:#3D4A66}
+.key-modal-hint{font-size:10px;color:#3D4A66;margin-top:6px;margin-bottom:18px;line-height:1.5}
+.key-modal-hint a{color:#F5A623;text-decoration:none}
+.key-modal-btn{width:100%;padding:11px;background:linear-gradient(135deg,#F5A623,#FFD166);border:none;border-radius:5px;color:#060910;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.05em;transition:opacity .2s}
+.key-modal-btn:hover{opacity:.9}
+.key-modal-btn:disabled{opacity:.4;cursor:default}
+.key-modal-secure{display:flex;align-items:center;gap:6px;margin-top:12px;padding:8px 10px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.15);border-radius:4px}
+.key-modal-secure-txt{font-size:10px;color:#10B981;line-height:1.4}
+.key-modal-error{font-size:10px;color:#EF4444;margin-top:8px;display:none}
+
 </style>
 </head>
 <body>
@@ -480,7 +499,23 @@ select:focus{outline:none;border-color:var(--gold)}
 'use strict';
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
-var API_KEY = ''; // Set your Anthropic API key here if deploying externally
+var API_KEY = '';
+
+// Securely load API key from browser session only
+function getAPIKey() {
+  if (API_KEY) return API_KEY;
+  var stored = sessionStorage.getItem('tdanalyst_key');
+  if (stored) { API_KEY = stored; return API_KEY; }
+  var key = prompt('Enter your Anthropic API Key to activate live analysis:
+(sk-ant-...)
+
+This is stored only in your browser session, never in code.');
+  if (key && key.startsWith('sk-ant-')) {
+    API_KEY = key;
+    sessionStorage.setItem('tdanalyst_key', key);
+  }
+  return API_KEY;
+} // Set your Anthropic API key here if deploying externally
 var REFRESH_MS = 75000;
 var MAX_HIST = 10;
 
@@ -784,8 +819,7 @@ function callAPI(pair, tf, prev) {
 
   var prompt = 'You are an expert gold (XAUUSD) and US30 trading analyst AI running a continuous self-improving strategy loop.\n\nPair: '+pair+' ('+info.name+')\nTimeframe: '+tf+'\nCurrent Price: '+price.toFixed(pair==="US30"?1:2)+'\nATR: ~'+info.atr+'\nCycle: '+(prev.length+1)+pc+'\n\nReturn ONLY valid compact JSON:\n{\n  "scalp":{"signal":"BUY"|"SELL"|"WAIT","confidence":<50-97>,"entry":<n>,"sl":<n>,"tp1":<n>,"tp2":<n>,"tp3":<n>,"rr":<n>,"style":"Scalp","note":"<text>"},\n  "day":{"signal":"BUY"|"SELL"|"WAIT","confidence":<50-97>,"entry":<n>,"sl":<n>,"tp1":<n>,"tp2":<n>,"tp3":<n>,"rr":<n>,"style":"Day Trade","note":"<text>"},\n  "swing":{"signal":"BUY"|"SELL"|"WAIT","confidence":<50-97>,"entry":<n>,"sl":<n>,"tp1":<n>,"tp2":<n>,"tp3":<n>,"rr":<n>,"style":"Swing","note":"<text>"},\n  "indicators":{\n    "rsi":{"value":<0-100>,"signal":"<overbought|oversold|neutral|divergence>","desc":"<text>"},\n    "ema":{"cross":"<bullish|bearish|neutral>","ema50":<n>,"ema200":<n>,"desc":"<text>"},\n    "macd":{"signal":"<bullish|bearish|neutral>","histogram":"<expanding|contracting>","desc":"<text>"},\n    "bb":{"position":"<upper|lower|middle|squeeze>","width":"<expanding|contracting|squeeze>","desc":"<text>"},\n    "atr":{"value":<n>,"volatility":"<high|normal|low>","desc":"<text>"},\n    "fib":{"level":"<text>","zone":"<text>","desc":"<text>"},\n    "gaussian":{"bias":"<bullish|bearish|neutral>","desc":"<text>"},\n    "sr":{"support":<n>,"resistance":<n>,"desc":"<text>"}\n  },\n  "keyLevels":{"entry":<n>,"sl":<n>,"tp1":<n>,"tp2":<n>,"tp3":<n>,"rr":<n>},\n  "winRate":<estimated win % 40-80>,\n  "bestSetup":"<scalp|day|swing>",\n  "summary":"<2 sentence market assessment and bias>",\n  "refinementNote":"'+(hasPrev?'<what improved vs previous cycle>':'Initial analysis cycle.')+'\",\n  "strategyStats":{"avgRR":<n>,"recommendedLotSize":"<conservative guidance>","sessionBias":"<London|NY|Asia|all>","keyRisk":"<text>"}\n}\nEntry near current price '+(price.toFixed(pair==="US30"?1:2))+'. Logical stop placement. Scale TPs with ATR. Base analysis on EMA 50/200, RSI divergence, Bollinger squeeze, Fibonacci 50/61.8%, ATR stops, MACD momentum, Gaussian channel bias.';
 
-  var headers = { 'Content-Type': 'application/json' };
-  if (API_KEY) { headers['x-api-key'] = API_KEY; headers['anthropic-version'] = '2023-06-01'; }
+  var headers = { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' };
 
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -1114,17 +1148,70 @@ document.addEventListener('DOMContentLoaded', function() {
   buildTicker();
   setInterval(tickPrices, 1500);
   setInterval(function(){ addChartCandle(); drawChart(); }, 4000);
-  startLoop();
-
+  // startLoop() is called by modal after key entry
   // Service worker for PWA
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function(){});
   }
 });
+
+// ── SECURE API KEY MODAL ──────────────────────────────────────────────────
+(function() {
+  var stored = sessionStorage.getItem('tdanalyst_key');
+  if (stored && stored.startsWith('sk-ant-')) {
+    API_KEY = stored;
+    document.getElementById('keyModal').style.display = 'none';
+  }
+})();
+
+document.getElementById('keyInput').addEventListener('input', function() {
+  var val = this.value.trim();
+  var btn = document.getElementById('keySubmitBtn');
+  var err = document.getElementById('keyError');
+  btn.disabled = !val.startsWith('sk-ant-');
+  err.style.display = (val.length > 5 && !val.startsWith('sk-ant-')) ? 'block' : 'none';
+});
+
+document.getElementById('keyInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') submitKey();
+});
+
+function submitKey() {
+  var val = document.getElementById('keyInput').value.trim();
+  if (!val.startsWith('sk-ant-')) return;
+  API_KEY = val;
+  sessionStorage.setItem('tdanalyst_key', val);
+  var modal = document.getElementById('keyModal');
+  modal.style.opacity = '0';
+  modal.style.transition = 'opacity .3s';
+  setTimeout(function() { modal.style.display = 'none'; startLoop(); }, 300);
+}
+
 </script>
 
 <!-- PWA Manifest inline ref -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#060910">
+
+<!-- API KEY MODAL -->
+<div class="key-modal-overlay" id="keyModal">
+  <div class="key-modal">
+    <div class="key-modal-logo">◈ TDANALYST</div>
+    <div class="key-modal-sub">XAUUSD &amp; US30 · Trading Intelligence</div>
+    <label class="key-modal-label">Anthropic API Key</label>
+    <input class="key-modal-input" id="keyInput" type="password" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false"/>
+    <div class="key-modal-hint">
+      Your key is stored <strong style="color:#94A3B8">only in this browser session</strong> — never in code or servers.<br>
+      Get a free key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys
+    </div>
+    <button class="key-modal-btn" id="keySubmitBtn" onclick="submitKey()" disabled>Activate Dashboard</button>
+    <div class="key-modal-error" id="keyError">Invalid key format. Must start with sk-ant-</div>
+    <div class="key-modal-secure">
+      <span style="font-size:14px">🔒</span>
+      <span class="key-modal-secure-txt">Key stored in sessionStorage only. Cleared when browser closes. Never sent anywhere except Anthropic's API.</span>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
