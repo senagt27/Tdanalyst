@@ -243,11 +243,11 @@ body{display:flex;flex-direction:column;}
   <button class="pair-btn" id="btnUS30" onclick="setPair('US30')">US30</button>
   <div class="nsep"></div>
   <div class="tf-wrap" id="tfWrap">
-    <button class="tf-btn on" onclick="setTf(this,'M5')">M5</button>
-    <button class="tf-btn" onclick="setTf(this,'M15')">M15</button>
-    <button class="tf-btn" onclick="setTf(this,'H1')">H1</button>
-    <button class="tf-btn" onclick="setTf(this,'H4')">H4</button>
-    <button class="tf-btn" onclick="setTf(this,'D1')">D1</button>
+    <button class="tf-btn on" id="tf_M5" onclick="setTf('M5')">M5</button>
+    <button class="tf-btn" id="tf_M15" onclick="setTf('M15')">M15</button>
+    <button class="tf-btn" id="tf_H1" onclick="setTf('H1')">H1</button>
+    <button class="tf-btn" id="tf_H4" onclick="setTf('H4')">H4</button>
+    <button class="tf-btn" id="tf_D1" onclick="setTf('D1')">D1</button>
   </div>
   <div class="nav-mid">
     <span class="price-pill" id="navPrice">2341.50</span>
@@ -1159,10 +1159,13 @@ function setPair(pair){
   document.getElementById('ohlcSym').style.color=PAIRS[pair].col;
   genChartData();drawChart();startLoop();
 }
-function setTf(btn,tf){
+function setTf(tf){
   TF=tf;
   document.querySelectorAll('.tf-btn').forEach(function(b){b.className='tf-btn';});
-  btn.className='tf-btn on';
+  var active=document.getElementById('tf_'+tf);
+  if(active)active.className='tf-btn on';
+  genChartData();
+  drawChart();
   startLoop();
 }
 function toggleNotif(){
