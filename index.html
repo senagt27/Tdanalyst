@@ -87,11 +87,16 @@ body{display:flex;flex-direction:column;}
 .panel.minimized{min-height:0!important;}
 
 /* RESIZE HANDLES */
-.rh{position:absolute;z-index:10;}
-.rh-r{top:4px;right:-3px;width:6px;height:calc(100%-8px);cursor:ew-resize;}
-.rh-b{bottom:-3px;left:4px;height:6px;width:calc(100%-8px);cursor:ns-resize;}
-.rh-br{bottom:-4px;right:-4px;width:12px;height:12px;cursor:se-resize;}
-.rh-br::after{content:'';position:absolute;bottom:2px;right:2px;width:6px;height:6px;border-right:2px solid var(--text3);border-bottom:2px solid var(--text3);}
+.rh{position:absolute;z-index:20;transition:background .15s;}
+.rh-r{top:0;right:0;width:5px;height:100%;cursor:ew-resize;background:transparent;}
+.rh-r:hover{background:rgba(41,98,255,.35);}
+.rh-b{bottom:0;left:0;height:5px;width:100%;cursor:ns-resize;background:transparent;}
+.rh-b:hover{background:rgba(41,98,255,.35);}
+.rh-br{bottom:0;right:0;width:16px;height:16px;cursor:se-resize;background:transparent;}
+.rh-br:hover{background:rgba(41,98,255,.2);}
+.rh-br::after{content:'';position:absolute;bottom:3px;right:3px;width:8px;height:8px;border-right:2px solid rgba(41,98,255,.7);border-bottom:2px solid rgba(41,98,255,.7);}
+.rh-tl{top:0;left:0;width:5px;height:100%;cursor:ew-resize;background:transparent;}
+.rh-tl:hover{background:rgba(41,98,255,.35);}
 
 /* PANEL CONTENTS */
 .ph{padding:6px 10px 4px;font-size:9px;font-weight:700;color:var(--text2);letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg);}
@@ -273,7 +278,7 @@ body{display:flex;flex-direction:column;}
     <button class="tf-btn" id="tf_D1" onclick="setTf('D1')">D1</button>
   </div>
   <div class="nav-mid">
-    <span class="nav-price" id="navPrice">4,726.00</span>
+    <span class="nav-price" id="navPrice">4,734.85</span>
     <span class="nav-chg" id="navChg" style="color:var(--green)">+0.82%</span>
   </div>
   <div class="nav-r">
@@ -304,7 +309,7 @@ body{display:flex;flex-direction:column;}
 var APIKEY='', PAIR='XAUUSD', TF='M5', NOTIF=false;
 var STORE={}, TIMER=null, CDTIMER=null, CD=0, LOADING=false;
 var TID=0, ANALYSIS=null, SNAP=false;
-var LPRICE={XAUUSD:4726.00,US30:49573.0};
+var LPRICE={XAUUSD:4734.85,US30:49687.0};
 var PDIR={XAUUSD:1,US30:1};
 var REFRESH=75000, MAXH=10;
 var ZOOM_BARS=100, ZOOM_MIN=20, ZOOM_MAX=300, PAN_OFFSET=0;
@@ -314,20 +319,21 @@ var CDATA=[], CTX=null;
 var SNAP_SIZE=20;
 
 var PAIRS={
-  XAUUSD:{name:'XAU/USD',base:4726.00,atr:28.0,col:'#f0b90b'},
-  US30:{name:'US30',base:49573.0,atr:320,col:'#2962ff'}
+  XAUUSD:{name:'XAU/USD',base:4734.85,atr:30.0,col:'#f0b90b'},
+  US30:{name:'US30',base:49687.0,atr:320,col:'#2962ff'}
 };
 
 var EVENTS=[
-  {t:'08:30 ET',e:'US CPI MoM',f:'+0.3%',imp:'h',n:'Major gold volatility'},
-  {t:'10:00 ET',e:'Fed Powell Speech',f:'Hawkish',imp:'h',n:'Rate path impact'},
-  {t:'08:30 ET',e:'Non-Farm Payrolls',f:'185K',imp:'h',n:'USD strength driver'},
-  {t:'14:00 ET',e:'FOMC Minutes',f:'Dovish signals',imp:'h',n:'Gold rally if dovish'},
-  {t:'10:30 ET',e:'EIA Crude Inventories',f:'-1.2M',imp:'m',n:'Risk sentiment'},
-  {t:'08:30 ET',e:'Jobless Claims',f:'215K',imp:'m',n:'Labour market'},
-  {t:'All Day',e:'COMEX Gold Expiry',f:'$2,350',imp:'h',n:'Pinning effect XAU'},
-  {t:'02:00 ET',e:'China GDP Q1',f:'+5.1%',imp:'h',n:'Gold demand outlook'},
-  {t:'07:45 ET',e:'ECB Rate Decision',f:'Hold 4.5%',imp:'h',n:'EUR/USD impacts gold'}
+  {t:'TODAY',e:'NFP April Released',f:'115K vs 62K exp',imp:'h',n:'Labor beat - hawkish Fed risk'},
+  {t:'May 12',e:'US CPI April',f:'Forecast +0.3%',imp:'h',n:'Critical inflation print'},
+  {t:'May 13',e:'US PPI April',f:'Forecast +0.2%',imp:'h',n:'Inflation precursor'},
+  {t:'May 14',e:'Initial Jobless Claims',f:'Forecast 210K',imp:'m',n:'Labour market health'},
+  {t:'Ongoing',e:'US-Iran Conflict',f:'Ceasefire fragile',imp:'h',n:'Gold safe-haven + oil risk'},
+  {t:'Ongoing',e:'Strait of Hormuz',f:'Partially closed',imp:'h',n:'Energy price surge - inflation'},
+  {t:'May 21',e:'Manufacturing PMI',f:'Forecast 51.2',imp:'m',n:'Economic activity signal'},
+  {t:'June',e:'FOMC Rate Decision',f:'Hold 3.50-3.75%',imp:'h',n:'94.9% expect hold'},
+  {t:'May 12',e:'COMEX Gold Options',f:'$4,700 max pain',imp:'m',n:'Pinning pressure on XAU'},
+  {t:'Weekly',e:'Gold Weekly Gain',f:'+2% this week',imp:'l',n:'US-Iran peace hopes lifted XAU'}
 ];
 
 // PANEL REGISTRY
@@ -401,7 +407,8 @@ function createPanel(type, x, y, w, h){
     '<div class="panel-body" id="body_'+id+'"></div>'+
     '<div class="rh rh-r" data-panel="'+id+'" data-dir="r"></div>'+
     '<div class="rh rh-b" data-panel="'+id+'" data-dir="b"></div>'+
-    '<div class="rh rh-br" data-panel="'+id+'" data-dir="br"></div>';
+    '<div class="rh rh-br" data-panel="'+id+'" data-dir="br"></div>'+
+    '<div class="rh rh-tl" data-panel="'+id+'" data-dir="l"></div>';
   ws.appendChild(el);
   PANELS[id]={id:id,type:type,el:el};
   renderPanelContent(id,type);
@@ -941,32 +948,66 @@ function setupPanelResize(id){
   var handles=el.querySelectorAll('.rh');
   handles.forEach(function(h){
     var dir=h.dataset.dir;
-    var startX,startY,startW,startH,resizing=false;
-    h.addEventListener('mousedown',function(e){
-      resizing=true;bringToFront(id);
-      startX=e.clientX;startY=e.clientY;
+    var startX,startY,startW,startH,startL,startT;
+    var active=false;
+
+    function onDown(clientX,clientY){
+      active=true;bringToFront(id);
+      startX=clientX;startY=clientY;
       startW=el.offsetWidth;startH=el.offsetHeight;
-      el.classList.add('resizing');showGrid(true);
-      e.stopPropagation();e.preventDefault();
-    });
-    window.addEventListener('mousemove',function(e){
-      if(!resizing)return;
-      var def=PANEL_DEFS[PANELS[id].type]||{minW:120,minH:80};
+      startL=parseInt(el.style.left)||0;
+      startT=parseInt(el.style.top)||0;
+      el.classList.add('resizing');
+      showGrid(true);
+      document.body.style.cursor=h.style.cursor||'se-resize';
+      document.body.style.userSelect='none';
+    }
+    function onMove(clientX,clientY){
+      if(!active)return;
+      var def=PANEL_DEFS[PANELS[id]?PANELS[id].type:'']||{minW:120,minH:80};
+      var dx=clientX-startX,dy=clientY-startY;
       if(dir==='r'||dir==='br'){
-        var nw=Math.max(def.minW,startW+(e.clientX-startX));
+        el.style.width=snapV(Math.max(def.minW,startW+dx))+'px';
+      }
+      if(dir==='l'){
+        var nw=Math.max(def.minW,startW-dx);
         el.style.width=snapV(nw)+'px';
+        el.style.left=snapV(startL+(startW-nw))+'px';
       }
       if(dir==='b'||dir==='br'){
-        var nh=Math.max(def.minH,startH+(e.clientY-startY));
-        el.style.height=snapV(nh)+'px';
+        el.style.height=snapV(Math.max(def.minH,startH+dy))+'px';
       }
-      // Trigger chart resize if needed
       var cp2=CHART_PANELS[id];
-      if(cp2)resizeChartPanel(id);
+      if(cp2)setTimeout(function(){resizeChartPanel(id);},0);
+    }
+    function onUp(){
+      if(active){
+        active=false;
+        el.classList.remove('resizing');
+        showGrid(false);
+        document.body.style.cursor='';
+        document.body.style.userSelect='';
+        saveLayout();
+      }
+    }
+
+    // Mouse
+    h.addEventListener('mousedown',function(e){
+      onDown(e.clientX,e.clientY);
+      e.stopPropagation();e.preventDefault();
     });
-    window.addEventListener('mouseup',function(){
-      if(resizing){resizing=false;el.classList.remove('resizing');showGrid(false);saveLayout();}
-    });
+    window.addEventListener('mousemove',function(e){if(active)onMove(e.clientX,e.clientY);});
+    window.addEventListener('mouseup',function(){if(active)onUp();});
+
+    // Touch
+    h.addEventListener('touchstart',function(e){
+      if(e.touches.length===1){onDown(e.touches[0].clientX,e.touches[0].clientY);}
+      e.stopPropagation();e.preventDefault();
+    },{passive:false});
+    window.addEventListener('touchmove',function(e){
+      if(active&&e.touches.length===1)onMove(e.touches[0].clientX,e.touches[0].clientY);
+    },{passive:false});
+    window.addEventListener('touchend',function(){if(active)onUp();});
   });
 }
 
